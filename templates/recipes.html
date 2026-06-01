@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block title %}Product Recipes – Milan Bakery{% endblock %}
+{% block page_title %}Product Recipes{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <span class="text-muted small">
+        Define which raw materials (and how much) are consumed when a batch is produced.
+        These quantities are deducted from stock automatically when a production batch is completed.
+    </span>
+    <button class="btn btn-bakery" data-bs-toggle="modal" data-bs-target="#addRecipeModal">
+        <i class="bi bi-plus-lg"></i> Add Recipe Item
+    </button>
+</div>
+
+<!-- Recipe table grouped by product -->
+{% set ns = namespace(last_product='') %}
+{% for r in recipe_rows %}
+{% if r.product_name != ns.last_product %}
+{% if ns.last_product != '' %}</tbody></table></div></div>{% endif %}
+{% set ns.last_product = r.product_name %}
+<div class="card card-bakery mb-3">
+    <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-box-seam" style="color:var(--bakery-brown);"></i>
+        <h5 class="mb-0">{{ r.product_name }}</h5>
+    </div>
+    <div class="card-body p-0">
+        <table class="table table-bakery mb-0">
+            <thead>
+                <tr>
+                    <th>Raw Material</th>
+                    <th>Qty per Unit Produced</th>
+                    <th>Unit</th>
+                    <th>Cost/Unit (₹)</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+{% endif %}
+            <tr>
+                <td class="fw-600">{{ r.material_name }}</td>
+                <td>{{ "%.4f"|format(r.quantity_required) }}</td>
+                <td>{{ r.unit }}</td>
+                <td>{{ "%.2f"|format(r.cost_per_unit) }}</td>
+                <td class="text-end">
+                    <form method="POST" action="{{ url_for('delete_recipe', recipe_id=r.id) }}"
+                          onsubmit="return confirm('Remove this ingredient from the recipe?')">
+                        <button class="btn btn-sm" style="color:#DC2626;background:#FEF2F2;border-radius:6px;">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </form>
+                </td>
+            </tr>
+{% endfor %}
+{% if recipe_rows %}
+        </tbody></table></div></div>
+{% else %}
+<div class="card card-bakery">
+    <div class="card-body text-center py-5 text-muted">
+        <i class="bi bi-journal-x" style="font-size:2.5rem;opacity:.4;"></i>
+        <p class="mt-3 mb-0">No recipes defined yet. Add ingredients above so stock is deducted when batches are completed.</p>
+    </div>
+</div>
+{% endif %}
+
+<!-- Add Recipe Modal -->
+<div class="modal fade" id="addRecipeModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content" style="border-radius:16px;border:none;">
+            <div class="modal-header" style="border-bottom:2px solid #F5F3EE;">
+                <h5 class="modal-title" style="font-family:'Playfair Display',serif;">Add Recipe Ingredient</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('add_recipe') }}">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-600">Product</label>
+                        <select name="product_id" class="form-select" required>
+                            <option value="">Select product…</option>
+                            {% for p in products %}
+                            <option value="{{ p.id }}">{{ p.product_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-600">Raw Material</label>
+                        <select name="material_id" class="form-select" required id="materialSelect">
+                            <option value="">Select material…</option>
+                            {% for m in raw_materials %}
+                            <option value="{{ m.id }}" data-unit="{{ m.unit }}">{{ m.material_name }} ({{ m.unit }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-7">
+                            <label class="form-label fw-600">Quantity per Unit Produced</label>
+                            <input type="number" name="quantity_required" class="form-control"
+                                   step="0.0001" min="0.0001" placeholder="e.g. 0.5" required>
+                            <div class="form-text">How much of this material is used to produce ONE unit (one loaf, one pack, etc.).</div>
+                        </div>
+                        <div class="col-5">
+                            <label class="form-label fw-600">Unit</label>
+                            <input type="text" name="unit" id="unitField" class="form-control" placeholder="KG / UNITS" required>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer" style="border-top:2px solid #F5F3EE;">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-bakery">Save Ingredient</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('materialSelect').addEventListener('change', function () {
+    const opt = this.options[this.selectedIndex];
+    document.getElementById('unitField').value = opt.dataset.unit || '';
+});
+</script>
+{% endblock %}

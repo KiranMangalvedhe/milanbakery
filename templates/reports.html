@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block title %}Reports – Milan Bakery{% endblock %}
+{% block page_title %}Reports & Analytics{% endblock %}
+{% block head %}<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>{% endblock %}
+{% block content %}
+<div class="row g-4">
+    <div class="col-12">
+        <div class="card-bakery card">
+            <div class="card-header"><h5>📦 Product Performance (Last 30 Days)</h5></div>
+            <div class="card-body p-0">
+                <table class="table table-bakery mb-0">
+                    <thead><tr><th>Product</th><th>Category</th><th>Units Sold</th><th>Revenue</th><th>Cost</th><th>Profit</th><th>Margin</th></tr></thead>
+                    <tbody>
+                    {% for p in by_product %}
+                    <tr>
+                        <td class="fw-600">{{ p.product_name }}</td>
+                        <td><span class="badge bg-light text-dark">{{ p.category }}</span></td>
+                        <td>{{ p.units_sold or 0 }}</td>
+                        <td class="text-success fw-bold">₹{{ "{:,.0f}".format((p.revenue or 0)|float) }}</td>
+                        <td class="text-muted">₹{{ "{:,.0f}".format((p.cost or 0)|float) }}</td>
+                        <td class="fw-bold">₹{{ "{:,.0f}".format((p.profit or 0)|float) }}</td>
+                        <td>
+                            {% if p.revenue and p.revenue > 0 %}
+                            <span class="{{ 'text-success' if (p.profit / p.revenue * 100) > 15 else 'text-warning' }} fw-600">
+                                {{ "{:.1f}".format(p.profit / p.revenue * 100) }}%
+                            </span>
+                            {% else %}–{% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="7" class="text-center text-muted py-4">No sales data yet.</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card-bakery card">
+            <div class="card-header"><h5>🏪 Sales by Shop (Last 30 Days)</h5></div>
+            <div class="card-body p-0">
+                <table class="table table-bakery mb-0">
+                    <thead><tr><th>Shop</th><th>Deliveries</th><th>Units</th><th>Total Spent</th></tr></thead>
+                    <tbody>
+                    {% for s in by_shop %}
+                    <tr>
+                        <td class="fw-600">{{ s.shop_name }}</td>
+                        <td>{{ s.deliveries }}</td>
+                        <td>{{ s.units_bought }}</td>
+                        <td class="fw-bold">₹{{ "{:,.0f}".format((s.total_spent or 0)|float) }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="4" class="text-center text-muted py-4">No data yet.</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card-bakery card">
+            <div class="card-header"><h5>👤 Salesman Performance (Last 30 Days)</h5></div>
+            <div class="card-body p-0">
+                <table class="table table-bakery mb-0">
+                    <thead><tr><th>Salesman</th><th>Trips</th><th>Collected</th><th>Allowance</th></tr></thead>
+                    <tbody>
+                    {% for s in by_salesman %}
+                    <tr>
+                        <td class="fw-600">{{ s.full_name }}</td>
+                        <td>{{ s.trips }}</td>
+                        <td class="fw-bold text-success">₹{{ "{:,.0f}".format((s.collected or 0)|float) }}</td>
+                        <td class="text-muted">₹{{ "{:,.0f}".format((s.allowance or 0)|float) }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="4" class="text-center text-muted py-4">No data yet.</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12">
+        <div class="card-bakery card">
+            <div class="card-header"><h5>♻️ Waste Analysis (Last 30 Days)</h5></div>
+            <div class="card-body p-0">
+                <table class="table table-bakery mb-0">
+                    <thead><tr><th>Product</th><th>Waste Type</th><th>Total Wasted</th><th>Decision</th></tr></thead>
+                    <tbody>
+                    {% for w in waste_analysis %}
+                    <tr>
+                        <td class="fw-600">{{ w.product_name }}</td>
+                        <td>{{ w.waste_type }}</td>
+                        <td class="text-danger fw-bold">{{ w.total_waste }}</td>
+                        <td><span class="badge-status badge-{{ w.decision }}">{{ w.decision }}</span></td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="4" class="text-center text-muted py-4">No waste records yet.</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,268 @@
+{% extends "base.html" %}
+{% block title %}Inventory – Milan Bakery{% endblock %}
+{% block page_title %}Inventory Management{% endblock %}
+
+{% block content %}
+<ul class="nav nav-tabs mb-4" id="inventoryTabs">
+    <li class="nav-item">
+        <a class="nav-link active" href="#raw" data-bs-toggle="tab">🌾 Raw Materials</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" href="#finished" data-bs-toggle="tab">📦 Finished Goods</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" href="#scanner" data-bs-toggle="tab"><i class="bi bi-upc-scan"></i> Scan Barcode</a>
+    </li>
+</ul>
+
+<div class="tab-content">
+    <!-- Raw Materials Tab -->
+    <div class="tab-pane fade show active" id="raw">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <span class="text-muted small">Track raw material stock levels and reorder points.</span>
+            <button class="btn btn-bakery" data-bs-toggle="modal" data-bs-target="#stockInModal">
+                <i class="bi bi-plus-lg"></i> Stock In
+            </button>
+        </div>
+
+        <div class="card-bakery card">
+            <div class="card-body p-0">
+                <table class="table table-bakery mb-0">
+                    <thead>
+                        <tr>
+                            <th>Material</th><th>Unit</th><th>Current Stock</th>
+                            <th>Reorder Level</th><th>Cost/Unit</th>
+                            <th>Supplier</th><th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for rm in raw_mats %}
+                    <tr>
+                        <td class="fw-600">{{ rm.material_name }}</td>
+                        <td>{{ rm.unit }}</td>
+                        <td>
+                            <strong class="{{ 'text-danger' if rm.stock_status == 'LOW' else 'text-success' }}">
+                                {{ rm.current_stock }} {{ rm.unit }}
+                            </strong>
+                        </td>
+                        <td class="text-muted">{{ rm.reorder_level }} {{ rm.unit }}</td>
+                        <td>₹{{ "{:.2f}".format(rm.cost_per_unit|float) }}</td>
+                        <td class="small text-muted">{{ rm.supplier_name or '–' }}</td>
+                        <td>
+                            {% if rm.stock_status == 'LOW' %}
+                            <span class="badge-status badge-CANCELLED">🔴 Low Stock</span>
+                            {% else %}
+                            <span class="badge-status badge-COMPLETED">✅ OK</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="7" class="text-center text-muted py-5">No raw materials found.</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Finished Goods Tab -->
+    <div class="tab-pane fade" id="finished">
+        <div class="card-bakery card mb-3">
+            <div class="card-body p-0">
+                <table class="table table-bakery mb-0">
+                    <thead>
+                        <tr>
+                            <th>Product</th><th>Pack Size</th><th>Available</th>
+                            <th>Avg. Price</th><th>Nearest Expiry</th><th>Status</th><th>Barcode</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for item in finished %}
+                    <tr>
+                        <td class="fw-600">{{ item.product_name }}</td>
+                        <td>{{ item.pack_size }} units/pack</td>
+                        <td><strong>{{ item.total_available or 0 }} packs</strong></td>
+                        <td>₹{{ "{:,.2f}".format(item.avg_price|float) }}</td>
+                        <td class="small text-muted">{{ item.nearest_expiry or '–' }}</td>
+                        <td><span class="badge-status badge-{{ item.status }}">{{ item.status }}</span></td>
+                        <td>
+                            {% if item.barcode %}
+                            <button class="btn btn-sm" style="background:#EEF2FF;color:#4F46E5;border-radius:6px;font-size:.75rem;"
+                                    onclick="showBarcode('{{ item.barcode }}','{{ item.product_name }}')">
+                                <i class="bi bi-upc"></i> Print
+                            </button>
+                            {% else %}–{% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="7" class="text-center text-muted py-5">No finished goods in inventory.</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Barcode Scanner Tab -->
+    <div class="tab-pane fade" id="scanner">
+        <div class="card card-bakery">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-upc-scan me-2"></i>Scan or Enter Barcode</h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="input-group mb-3">
+                            <input type="text" id="barcodeInput" class="form-control form-control-lg"
+                                   placeholder="Scan or type barcode…" autofocus>
+                            <button class="btn btn-bakery" onclick="lookupBarcode()">
+                                <i class="bi bi-search"></i> Lookup
+                            </button>
+                        </div>
+                        <div id="barcodeResult" class="p-3 rounded d-none" style="background:#FFF8E7;border:1.5px solid #D4A574;"></div>
+                    </div>
+                    <div class="col-md-6">
+                        <div id="cameraPreview" class="d-none">
+                            <div id="scannerContainer" style="width:100%;max-width:400px;border-radius:12px;overflow:hidden;"></div>
+                            <button class="btn btn-outline-secondary btn-sm mt-2" onclick="stopCamera()">Stop Camera</button>
+                        </div>
+                        <button class="btn btn-outline-secondary" onclick="startCamera()" id="startCamBtn">
+                            <i class="bi bi-camera"></i> Use Camera
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Barcode Print Modal -->
+<div class="modal fade" id="barcodeModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content" style="border-radius:16px;border:none;">
+            <div class="modal-header" style="border-bottom:2px solid #F5F3EE;">
+                <h5 class="modal-title" id="barcodeModalTitle">Barcode Label</h5>
+                <button class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center">
+                <svg id="barcodeLabel"></svg>
+                <div class="small text-muted mt-2" id="barcodeModalCode"></div>
+            </div>
+            <div class="modal-footer" style="border-top:2px solid #F5F3EE;justify-content:center;">
+                <button class="btn btn-bakery" onclick="window.print()">
+                    <i class="bi bi-printer"></i> Print Label
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Stock In Modal -->
+<div class="modal fade" id="stockInModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">🌾 Add Raw Material Stock</h5>
+                <button class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('stock_in') }}">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Material *</label>
+                        <select name="material_id" class="form-select" required>
+                            <option value="">Select material...</option>
+                            {% for rm in raw_mats %}
+                            <option value="{{ rm.id }}">{{ rm.material_name }} ({{ rm.current_stock }} {{ rm.unit }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-6">
+                            <label class="form-label">Quantity *</label>
+                            <input type="number" name="quantity" class="form-control" step="0.01" min="0.01" required>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Cost per Unit (₹) *</label>
+                            <input type="number" name="cost_per_unit" class="form-control" step="0.01" min="0" required>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Notes</label>
+                        <input type="text" name="notes" class="form-control" placeholder="Supplier batch / invoice number...">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button class="btn btn-bakery"><i class="bi bi-box-arrow-in-down"></i> Add Stock</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script>
+let html5QrCode = null;
+
+function showBarcode(code, name) {
+    document.getElementById('barcodeModalTitle').textContent = name;
+    document.getElementById('barcodeModalCode').textContent = code;
+    JsBarcode('#barcodeLabel', code, {format:'CODE128', width:2, height:60, displayValue:true, fontSize:12});
+    new bootstrap.Modal(document.getElementById('barcodeModal')).show();
+}
+
+function lookupBarcode() {
+    const code = document.getElementById('barcodeInput').value.trim();
+    if (!code) return;
+    fetch('/api/scan/' + encodeURIComponent(code))
+        .then(r => r.json())
+        .then(data => {
+            const box = document.getElementById('barcodeResult');
+            box.classList.remove('d-none');
+            if (!data.found) {
+                box.innerHTML = '<span class="text-danger"><i class="bi bi-x-circle"></i> Barcode not found: ' + code + '</span>';
+                return;
+            }
+            const d = data.data;
+            if (data.type === 'inventory') {
+                box.innerHTML = `<strong>${d.product_name}</strong><br>
+                    Pack: ${d.pack_size} units &nbsp;|&nbsp; Available: <strong>${d.quantity_available}</strong> packs<br>
+                    Price: ₹${d.selling_price} &nbsp;|&nbsp; Status: ${d.status}<br>
+                    Expiry: ${d.expiry_date || '–'}`;
+            } else {
+                box.innerHTML = `<strong>${d.material_name}</strong><br>
+                    Unit: ${d.unit} &nbsp;|&nbsp; Stock: <strong>${d.current_stock}</strong> ${d.unit}`;
+            }
+        });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const inp = document.getElementById('barcodeInput');
+    if (inp) inp.addEventListener('keydown', e => { if (e.key === 'Enter') lookupBarcode(); });
+});
+
+function startCamera() {
+    document.getElementById('cameraPreview').classList.remove('d-none');
+    document.getElementById('startCamBtn').classList.add('d-none');
+    html5QrCode = new Html5Qrcode('scannerContainer');
+    html5QrCode.start(
+        {facingMode: 'environment'},
+        {fps: 10, qrbox: {width: 250, height: 120}},
+        code => {
+            document.getElementById('barcodeInput').value = code;
+            lookupBarcode();
+            stopCamera();
+        },
+        () => {}
+    );
+}
+
+function stopCamera() {
+    if (html5QrCode) { html5QrCode.stop(); html5QrCode = null; }
+    document.getElementById('cameraPreview').classList.add('d-none');
+    document.getElementById('startCamBtn').classList.remove('d-none');
+}
+</script>
+{% endblock %}

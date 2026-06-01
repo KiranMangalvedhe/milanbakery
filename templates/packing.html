@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% block title %}Packing Unit – Milan Bakery{% endblock %}
+{% block page_title %}Packing Unit{% endblock %}
+
+{% block content %}
+<p class="text-muted small mb-4">Convert completed production batches into packed inventory ready for dispatch.</p>
+
+<!-- Completed Batches Ready to Pack -->
+<div class="card card-bakery mb-4">
+    <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-gear-fill" style="color:#FF8C42;"></i>
+        <h5 class="mb-0">Completed Batches — Ready to Pack</h5>
+    </div>
+    <div class="card-body p-0">
+        <table class="table table-bakery mb-0">
+            <thead>
+                <tr>
+                    <th>Batch No.</th><th>Product</th><th>Date</th>
+                    <th>Units Produced</th><th>Pack Size</th><th>Already Packed</th><th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for b in completed_batches %}
+            <tr>
+                <td class="text-muted small fw-600">{{ b.batch_number }}</td>
+                <td class="fw-600">{{ b.product_name }}</td>
+                <td class="small">{{ b.production_date }}</td>
+                <td><strong>{{ b.actual_quantity }}</strong></td>
+                <td>{{ b.pack_size }} units/pack</td>
+                <td>
+                    {% if b.already_packed > 0 %}
+                    <span class="badge-status badge-COMPLETED">{{ b.already_packed }} packs</span>
+                    {% else %}<span class="text-muted">None yet</span>{% endif %}
+                </td>
+                <td>
+                    <button class="btn btn-sm btn-bakery"
+                            onclick="openPackModal('{{ b.id }}','{{ b.batch_number }}','{{ b.product_name }}',{{ b.actual_quantity }},{{ b.pack_size }})">
+                        <i class="bi bi-box-seam"></i> Pack
+                    </button>
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="7" class="text-center text-muted py-4">No completed batches available to pack.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Packing History -->
+<div class="card card-bakery">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-clock-history me-2"></i>Packing History</h5>
+    </div>
+    <div class="card-body p-0">
+        <table class="table table-bakery mb-0">
+            <thead>
+                <tr>
+                    <th>Date</th><th>Batch</th><th>Product</th>
+                    <th>Packs Created</th><th>Pack Size</th><th>Packing Cost</th><th>Packed By</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for h in packing_history %}
+            <tr>
+                <td class="small">{{ h.packaging_date }}</td>
+                <td class="text-muted small">{{ h.batch_number }}</td>
+                <td class="fw-600">{{ h.product_name }}</td>
+                <td><strong>{{ h.packs_created }}</strong></td>
+                <td>{{ h.pack_size }} units/pack</td>
+                <td>₹{{ "%.2f"|format(h.packaging_cost|float) }}</td>
+                <td class="small text-muted">{{ h.packed_by or '–' }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="7" class="text-center text-muted py-4">No packing history found.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Pack Modal -->
+<div class="modal fade" id="packModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content" style="border-radius:16px;border:none;">
+            <div class="modal-header" style="border-bottom:2px solid #F5F3EE;">
+                <h5 class="modal-title" style="font-family:'Playfair Display',serif;">
+                    <i class="bi bi-box-seam me-2" style="color:#FF8C42;"></i>Pack Batch
+                </h5>
+                <button class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('new_packing') }}">
+                <input type="hidden" name="batch_id" id="packBatchId">
+                <div class="modal-body">
+                    <div class="p-3 mb-3 rounded" style="background:#FFF8E7;border:1.5px solid #D4A574;">
+                        <div class="fw-600" id="packBatchInfo"></div>
+                        <div class="small text-muted mt-1">
+                            Expected packs: <strong id="expectedPacks">–</strong>
+                            (at <span id="packSizeLabel">–</span> units/pack)
+                        </div>
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-6">
+                            <label class="form-label fw-600">Packs Created *</label>
+                            <input type="number" name="packs_created" id="packsInput" class="form-control" min="1" required>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-600">Packaging Material Cost (₹)</label>
+                            <input type="number" name="packaging_cost" class="form-control" step="0.01" min="0" value="0">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-600">Labour Cost (₹)</label>
+                        <input type="number" name="labour_cost" class="form-control" step="0.01" min="0" value="0">
+                    </div>
+                </div>
+                <div class="modal-footer" style="border-top:2px solid #F5F3EE;">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-bakery">
+                        <i class="bi bi-box-arrow-in-down"></i> Add to Inventory
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function openPackModal(id, batchNum, product, units, packSize) {
+    document.getElementById('packBatchId').value = id;
+    document.getElementById('packBatchInfo').textContent = batchNum + ' — ' + product;
+    document.getElementById('expectedPacks').textContent = Math.floor(units / packSize);
+    document.getElementById('packSizeLabel').textContent = packSize;
+    document.getElementById('packsInput').value = Math.floor(units / packSize);
+    new bootstrap.Modal(document.getElementById('packModal')).show();
+}
+</script>
+{% endblock %}

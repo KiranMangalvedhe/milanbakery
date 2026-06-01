@@ -1,0 +1,257 @@
+{% extends "base.html" %}
+{% block title %}Production – Milan Bakery{% endblock %}
+{% block page_title %}Production Management{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <span class="text-muted small">Manage production batches, track progress, and handle waste.</span>
+    </div>
+    <button class="btn btn-bakery" data-bs-toggle="modal" data-bs-target="#newBatchModal">
+        <i class="bi bi-plus-lg"></i> New Batch
+    </button>
+</div>
+
+<!-- Waste Decision Queue -->
+{% if waste_queue %}
+<div class="card-bakery card mb-4">
+    <div class="card-header d-flex align-items-center gap-2" style="background:#FEF9C3;">
+        <i class="bi bi-exclamation-triangle-fill" style="color:#854D0E;font-size:1.1rem;"></i>
+        <h5 style="color:#854D0E;margin:0;">Waste Pending Decision ({{ waste_queue|length }})</h5>
+    </div>
+    <div class="card-body p-0">
+        <table class="table table-bakery mb-0">
+            <thead>
+                <tr>
+                    <th>Batch</th><th>Product</th><th>Type</th>
+                    <th>Qty</th><th>Reason</th><th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for w in waste_queue %}
+            <tr>
+                <td class="small text-muted">{{ w.batch_number }}</td>
+                <td class="fw-600">{{ w.product_name }}</td>
+                <td>{{ w.waste_type }}</td>
+                <td><strong>{{ w.quantity }}</strong></td>
+                <td class="text-muted small">{{ w.reason or '–' }}</td>
+                <td>
+                    <div class="d-flex gap-2">
+                        <form method="POST" action="{{ url_for('decide_waste', waste_id=w.id) }}" class="d-inline">
+                            <input type="hidden" name="decision" value="REFURBISH">
+                            <button class="btn btn-sm" style="background:#F0FDF4;color:#16A34A;border-radius:6px;font-weight:600;font-size:.75rem;">
+                                ♻️ Refurbish
+                            </button>
+                        </form>
+                        <form method="POST" action="{{ url_for('decide_waste', waste_id=w.id) }}" class="d-inline">
+                            <input type="hidden" name="decision" value="WASTE">
+                            <button class="btn btn-sm" style="background:#FEF2F2;color:#DC2626;border-radius:6px;font-weight:600;font-size:.75rem;">
+                                🗑️ Write Off
+                            </button>
+                        </form>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<!-- Production Batches -->
+<div class="card-bakery card">
+    <div class="card-header">
+        <h5><i class="bi bi-gear-fill me-2" style="color:#FF8C42;"></i>Production Batches</h5>
+    </div>
+    <div class="card-body p-0">
+        <table class="table table-bakery mb-0">
+            <thead>
+                <tr>
+                    <th>Batch No.</th><th>Product</th><th>Date</th>
+                    <th>Planned</th><th>Actual</th><th>Waste</th>
+                    <th>Manager</th><th>Status</th><th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for b in batches %}
+            <tr>
+                <td class="text-muted small fw-600">{{ b.batch_number }}</td>
+                <td class="fw-600">{{ b.product_name }}</td>
+                <td class="small">{{ b.production_date }}</td>
+                <td>{{ b.planned_quantity }}</td>
+                <td>{{ b.actual_quantity or '–' }}</td>
+                <td>
+                    {% if b.waste_quantity and b.waste_quantity > 0 %}
+                    <span style="color:#DC2626;font-weight:600;">{{ b.waste_quantity }}</span>
+                    {% else %}–{% endif %}
+                </td>
+                <td class="small">{{ b.manager_name or '–' }}</td>
+                <td><span class="badge-status badge-{{ b.status }}">{{ b.status }}</span></td>
+                <td>
+                    <div class="d-flex gap-1 flex-wrap">
+                    {% if b.status == 'PLANNED' %}
+                    <form method="POST" action="{{ url_for('update_batch', batch_id=b.id) }}" class="d-inline">
+                        <input type="hidden" name="action" value="start">
+                        <button class="btn btn-sm btn-bakery">▶ Start</button>
+                    </form>
+                    {% elif b.status == 'IN_PROGRESS' %}
+                    <button class="btn btn-sm btn-bakery"
+                            onclick="openCompleteModal('{{ b.id }}')">✓ Complete</button>
+                    {% endif %}
+                    <button class="btn btn-sm" style="background:#FFF8E7;color:#8B4513;border:1px solid #D4A574;"
+                            onclick="openCostModal('{{ b.id }}','{{ b.batch_number }}')">
+                        <i class="bi bi-plus-circle"></i> Cost
+                    </button>
+                    </div>
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="9" class="text-center text-muted py-5">No production batches found.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- New Batch Modal -->
+<div class="modal fade" id="newBatchModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">🏭 Create Production Batch</h5>
+                <button class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('new_batch') }}">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Product *</label>
+                        <select name="product_id" class="form-select" required>
+                            <option value="">Select product...</option>
+                            {% for p in products %}
+                            <option value="{{ p.id }}">{{ p.product_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-6">
+                            <label class="form-label">Planned Quantity *</label>
+                            <input type="number" name="planned_quantity" class="form-control" min="1" required>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Production Date *</label>
+                            <input type="date" name="production_date" class="form-control"
+                                   value="{{ today.strftime('%Y-%m-%d') if today else '' }}" required>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Notes</label>
+                        <textarea name="notes" class="form-control" rows="2" placeholder="Optional notes..."></textarea>
+                    </div>
+
+                    <!-- Raw material summary -->
+                    <div class="p-3 rounded" style="background:#FFF8E7;border:1.5px solid #D4A574;">
+                        <div class="fw-600 small mb-2" style="color:#8B4513;">📦 Current Raw Material Stock</div>
+                        {% for rm in raw_materials %}
+                        <div class="d-flex justify-content-between small mb-1">
+                            <span>{{ rm.material_name }}</span>
+                            <span class="{{ 'text-danger' if rm.current_stock <= rm.reorder_level else 'text-success' }} fw-600">
+                                {{ rm.current_stock }} {{ rm.unit }}
+                            </span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button class="btn btn-bakery"><i class="bi bi-gear"></i> Create Batch</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Complete Batch Modal -->
+<div class="modal fade" id="completeBatchModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">✅ Complete Production Batch</h5>
+                <button class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" id="completeBatchForm" action="">
+                <input type="hidden" name="action" value="complete">
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-6">
+                            <label class="form-label">Actual Quantity Produced *</label>
+                            <input type="number" name="actual_quantity" class="form-control" min="0" required>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Waste Quantity</label>
+                            <input type="number" name="waste_quantity" class="form-control" min="0" value="0">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button class="btn btn-bakery">Mark Complete</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+<!-- Add Cost Modal -->
+<div class="modal fade" id="addCostModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content" style="border-radius:16px;border:none;">
+            <div class="modal-header" style="border-bottom:2px solid #F5F3EE;">
+                <h5 class="modal-title" style="font-family:'Playfair Display',serif;">Add Batch Cost</h5>
+                <button class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" id="costForm">
+                <div class="modal-body">
+                    <div class="small text-muted mb-3" id="costBatchLabel"></div>
+                    <div class="mb-3">
+                        <label class="form-label fw-600">Cost Type *</label>
+                        <select name="cost_type" class="form-select" required>
+                            <option value="FUEL">Fuel / Gas</option>
+                            <option value="ELECTRICITY">Electricity</option>
+                            <option value="LABOUR">Labour</option>
+                            <option value="MAINTENANCE">Maintenance</option>
+                            <option value="OTHER">Other</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-600">Amount (₹) *</label>
+                        <input type="number" name="amount" class="form-control" step="0.01" min="0.01" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-600">Description</label>
+                        <input type="text" name="description" class="form-control" placeholder="e.g. LPG cylinder, 14kg">
+                    </div>
+                </div>
+                <div class="modal-footer" style="border-top:2px solid #F5F3EE;">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-bakery">Save Cost</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% block scripts %}
+<script>
+function openCompleteModal(batchId) {
+    document.getElementById('completeBatchForm').action = '/production/batch/' + batchId + '/update';
+    new bootstrap.Modal(document.getElementById('completeBatchModal')).show();
+}
+function openCostModal(batchId, batchNum) {
+    document.getElementById('costForm').action = '/production/batch/' + batchId + '/cost/add';
+    document.getElementById('costBatchLabel').textContent = 'Batch: ' + batchNum;
+    new bootstrap.Modal(document.getElementById('addCostModal')).show();
+}
+</script>
+{% endblock %}

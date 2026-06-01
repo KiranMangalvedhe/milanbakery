@@ -1,0 +1,29 @@
+{
+  "name": "Milan Bakery Management",
+  "short_name": "Milan Bakery",
+  "description": "Bakery production, inventory, and delivery management",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#FFF8E7",
+  "theme_color": "#8B4513",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/static/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/static/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {"name": "Production", "url": "/production", "description": "View production batches"},
+    {"name": "Inventory",  "url": "/inventory",  "description": "Check stock levels"},
+    {"name": "Delivery",   "url": "/delivery",   "description": "Manage trips"}
+  ]
+}

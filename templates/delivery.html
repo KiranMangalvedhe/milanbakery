@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% block title %}Delivery – Milan Bakery{% endblock %}
+{% block page_title %}Delivery Management{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <span class="text-muted small">Manage delivery trips, track returns and pending decisions.</span>
+    {% if session.role in ['ADMIN','OWNER'] %}
+    <button class="btn btn-bakery" data-bs-toggle="modal" data-bs-target="#newTripModal">
+        <i class="bi bi-plus-lg"></i> New Trip
+    </button>
+    {% endif %}
+</div>
+
+{% if returns %}
+<div class="card-bakery card mb-4" style="border-left:4px solid #EA580C;">
+    <div class="card-header" style="background:#FFF7ED;">
+        <h5 style="color:#EA580C;margin:0;"><i class="bi bi-arrow-return-left"></i> Returns Pending Decision ({{ returns|length }})</h5>
+    </div>
+    <div class="card-body p-0">
+        <table class="table table-bakery mb-0">
+            <thead><tr><th>Shop</th><th>Product</th><th>Qty</th><th>Reason</th><th>Condition</th><th>Decision</th></tr></thead>
+            <tbody>
+            {% for r in returns %}
+            <tr>
+                <td class="fw-600">{{ r.shop_name }}</td>
+                <td>{{ r.product_name }}</td>
+                <td><strong>{{ r.quantity_returned }}</strong></td>
+                <td class="small">{{ r.return_reason|replace('_',' ') }}</td>
+                <td><span class="badge-status badge-{{ r.return_condition }}">{{ r.return_condition }}</span></td>
+                <td>
+                    <div class="d-flex gap-2">
+                        <form method="POST" action="{{ url_for('decide_return', return_id=r.id) }}" class="d-inline">
+                            <input type="hidden" name="decision" value="REFURBISH">
+                            <button class="btn btn-sm" style="background:#F0FDF4;color:#16A34A;border-radius:6px;font-size:.75rem;font-weight:600;">♻️ Refurbish</button>
+                        </form>
+                        <form method="POST" action="{{ url_for('decide_return', return_id=r.id) }}" class="d-inline">
+                            <input type="hidden" name="decision" value="WASTE">
+                            <button class="btn btn-sm" style="background:#FEF2F2;color:#DC2626;border-radius:6px;font-size:.75rem;font-weight:600;">🗑️ Waste</button>
+                        </form>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<div class="card-bakery card">
+    <div class="card-header"><h5><i class="bi bi-truck me-2" style="color:#FF8C42;"></i>Delivery Trips</h5></div>
+    <div class="card-body p-0">
+        <table class="table table-bakery mb-0">
+            <thead>
+                <tr>
+                    <th>Trip</th><th>Date</th>
+                    {% if session.role != 'SALESMAN' %}<th>Salesman</th>{% endif %}
+                    <th>Deliveries</th><th>Collected</th><th>Status</th><th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for t in trips %}
+            <tr>
+                <td class="fw-600 small">{{ t.trip_number }}<br><span class="text-muted">Trip #{{ t.trip_sequence }}</span></td>
+                <td class="small">{{ t.trip_date }}</td>
+                {% if session.role != 'SALESMAN' %}
+                <td>{{ t.salesman_name or '–' }}</td>
+                {% endif %}
+                <td>
+                    <span class="{{ 'text-success' if t.completed == t.total_deliveries and t.total_deliveries > 0 else 'text-muted' }}">
+                        {{ t.completed or 0 }} / {{ t.total_deliveries or 0 }}
+                    </span>
+                </td>
+                <td>₹{{ "{:,.0f}".format(((t.cash_collected or 0)|float) + ((t.digital_collected or 0)|float)) }}</td>
+                <td><span class="badge-status badge-{{ t.status }}">{{ t.status }}</span></td>
+                <td>
+                    {% if t.status == 'PLANNED' %}
+                    <form method="POST" action="{{ url_for('update_trip_status', trip_id=t.id) }}" class="d-inline">
+                        <input type="hidden" name="status" value="IN_TRANSIT">
+                        <button class="btn btn-sm btn-bakery">▶ Start</button>
+                    </form>
+                    {% elif t.status == 'IN_TRANSIT' %}
+                    <form method="POST" action="{{ url_for('update_trip_status', trip_id=t.id) }}" class="d-inline">
+                        <input type="hidden" name="status" value="COMPLETED">
+                        <button class="btn btn-sm btn-outline-bakery">✓ Complete</button>
+                    </form>
+                    {% endif %}
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="7" class="text-center text-muted py-5">No delivery trips in the last 7 days.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- New Trip Modal -->
+<div class="modal fade" id="newTripModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">🚚 Create Delivery Trip</h5>
+                <button class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('new_trip') }}">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Salesman *</label>
+                        <select name="salesman_id" class="form-select" required>
+                            <option value="">Select salesman...</option>
+                            {% for s in salesmen %}
+                            <option value="{{ s.id }}">{{ s.full_name }} ({{ s.employee_code }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-6">
+                            <label class="form-label">Trip Date *</label>
+                            <input type="date" name="trip_date" class="form-control"
+                                   value="{{ today.strftime('%Y-%m-%d') if today else '' }}" required>
+                        </div>
+                        <div class="col-3">
+                            <label class="form-label">Sequence</label>
+                            <select name="trip_sequence" class="form-select">
+                                <option value="1">Trip 1</option>
+                                <option value="2">Trip 2</option>
+                                <option value="3">Trip 3</option>
+                            </select>
+                        </div>
+                        <div class="col-3">
+                            <label class="form-label">Allowance (₹)</label>
+                            <input type="number" name="allowance" class="form-control" value="500">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button class="btn btn-bakery"><i class="bi bi-truck"></i> Create Trip</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

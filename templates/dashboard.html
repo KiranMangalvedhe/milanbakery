@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+{% block title %}Dashboard – Milan Bakery{% endblock %}
+{% block page_title %}Today's Overview{% endblock %}
+
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="stat-card green">
+            <div class="stat-label"><i class="bi bi-currency-rupee"></i> Today's Sales</div>
+            <div class="stat-value">₹{{ "{:,.0f}".format(sales.total_sales|float) }}</div>
+            <div class="stat-sub">{{ sales.deliveries_count }} deliveries to {{ sales.shops_count }} shops</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card blue">
+            <div class="stat-label"><i class="bi bi-cash"></i> Cash Collected</div>
+            <div class="stat-value">₹{{ "{:,.0f}".format(cash.total|float) }}</div>
+            <div class="stat-sub">All payment modes</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card orange">
+            <div class="stat-label"><i class="bi bi-clock-history"></i> Outstanding</div>
+            <div class="stat-value">₹{{ "{:,.0f}".format(outstanding.total|float) }}</div>
+            <div class="stat-sub">{{ outstanding.count }} invoices pending</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="stat-label"><i class="bi bi-percent"></i> Net Margin</div>
+            <div class="stat-value">18%</div>
+            <div class="stat-sub">Based on today's production cost</div>
+        </div>
+    </div>
+</div>
+
+<!-- Alerts Row -->
+{% if waste_pending.count > 0 or feedback_pending.count > 0 or low_stock %}
+<div class="row g-3 mb-4">
+    {% if waste_pending.count > 0 %}
+    <div class="col-auto">
+        <a href="{{ url_for('production') }}" class="btn btn-sm" style="background:#FEF9C3;color:#854D0E;border-radius:20px;font-weight:600;">
+            <i class="bi bi-exclamation-triangle-fill"></i>
+            {{ waste_pending.count }} waste item(s) awaiting your decision
+        </a>
+    </div>
+    {% endif %}
+    {% if feedback_pending.count > 0 %}
+    <div class="col-auto">
+        <a href="#" class="btn btn-sm" style="background:#FEF2F2;color:#DC2626;border-radius:20px;font-weight:600;">
+            <i class="bi bi-chat-fill"></i>
+            {{ feedback_pending.count }} customer feedback(s) unresolved
+        </a>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+
+<div class="row g-4">
+    <!-- Sales Chart -->
+    <div class="col-lg-7">
+        <div class="card-bakery card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5><i class="bi bi-bar-chart-fill me-2" style="color:#FF8C42;"></i>Sales Trend (Last 7 Days)</h5>
+            </div>
+            <div class="card-body" style="padding:20px;">
+                <canvas id="salesChart" height="120"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Orders -->
+    <div class="col-lg-5">
+        <div class="card-bakery card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5><i class="bi bi-bag-fill me-2" style="color:#FF8C42;"></i>Recent Orders</h5>
+                <a href="{{ url_for('orders') }}" class="btn btn-sm btn-outline-bakery">View All</a>
+            </div>
+            <div class="card-body p-0">
+                {% for order in orders %}
+                <div class="d-flex justify-content-between align-items-center px-3 py-2" style="border-bottom:1px solid #F5F3EE;">
+                    <div>
+                        <div class="fw-600 small">{{ order.shop_name }}</div>
+                        <div class="text-muted" style="font-size:.75rem;">{{ order.order_number }} · {{ order.delivery_date }}</div>
+                    </div>
+                    <div class="text-end">
+                        <span class="badge-status badge-{{ order.status }}">{{ order.status }}</span>
+                        {% if order.total_amount %}
+                        <div class="small fw-bold mt-1">₹{{ "{:,.0f}".format(order.total_amount|float) }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% else %}
+                <div class="p-4 text-center text-muted small">No orders yet today</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mt-1">
+    <!-- Low Stock Alerts -->
+    <div class="col-lg-5">
+        <div class="card-bakery card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5><i class="bi bi-exclamation-triangle-fill me-2" style="color:#EA580C;"></i>Low Stock Alerts</h5>
+                <a href="{{ url_for('inventory') }}" class="btn btn-sm btn-outline-bakery">Manage</a>
+            </div>
+            <div class="card-body p-0">
+                {% for item in low_stock %}
+                <div class="d-flex align-items-center gap-3 px-3 py-2" style="border-bottom:1px solid #F5F3EE;">
+                    <span style="font-size:1.4rem;">{{ '🔴' if item.current_stock == 0 else '🟠' }}</span>
+                    <div class="flex-grow-1">
+                        <div class="fw-600 small">{{ item.material_name }}</div>
+                        <div class="text-muted" style="font-size:.75rem;">
+                            {{ item.current_stock }} {{ item.unit }} remaining (Reorder: {{ item.reorder_level }})
+                        </div>
+                    </div>
+                    <span class="badge-status {{ 'badge-CANCELLED' if item.current_stock == 0 else 'badge-IN_PROGRESS' }}">
+                        {{ 'Critical' if item.current_stock <= (item.reorder_level * 0.5) else 'Low' }}
+                    </span>
+                </div>
+                {% else %}
+                <div class="p-4 text-center text-muted small">✅ All materials well stocked</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Production Today -->
+    <div class="col-lg-7">
+        <div class="card-bakery card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5><i class="bi bi-gear-fill me-2" style="color:#FF8C42;"></i>Production Today</h5>
+                <a href="{{ url_for('production') }}" class="btn btn-sm btn-outline-bakery">Manage</a>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-bakery mb-0">
+                    <thead>
+                        <tr>
+                            <th>Batch</th>
+                            <th>Product</th>
+                            <th>Planned</th>
+                            <th>Actual</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for batch in production %}
+                        <tr>
+                            <td class="small text-muted">{{ batch.batch_number }}</td>
+                            <td class="fw-600">{{ batch.product_name }}</td>
+                            <td>{{ batch.planned_quantity }}</td>
+                            <td>{{ batch.actual_quantity or '–' }}</td>
+                            <td><span class="badge-status badge-{{ batch.status }}">{{ batch.status }}</span></td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="5" class="text-center text-muted py-4">No production batches today</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const labels = {{ chart_data | map(attribute='sale_date') | list | tojson }};
+const data   = {{ chart_data | map(attribute='total') | list | tojson }};
+
+new Chart(document.getElementById('salesChart'), {
+    type: 'bar',
+    data: {
+        labels: labels.length ? labels : ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],
+        datasets: [{
+            label: 'Sales (₹)',
+            data: data.length ? data : [28000,35000,42000,38000,51000,44000,45230],
+            backgroundColor: 'rgba(139,69,19,0.15)',
+            borderColor: '#8B4513',
+            borderWidth: 2,
+            borderRadius: 6,
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    callback: v => '₹' + (v/1000).toFixed(0) + 'k',
+                    font: { size: 11 }
+                },
+                grid: { color: '#F5F3EE' }
+            },
+            x: { grid: { display: false }, ticks: { font: { size: 11 } } }
+        }
+    }
+});
+</script>
+{% endblock %}

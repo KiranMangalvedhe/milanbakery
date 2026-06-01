@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block title %}Shop Feedback – Milan Bakery{% endblock %}
+{% block page_title %}Shop Feedback{% endblock %}
+
+{% block content %}
+{% set open_items   = items | selectattr('status','eq','OPEN')     | list %}
+{% set closed_items = items | selectattr('status','eq','RESOLVED') | list %}
+
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="stat-card red">
+            <div class="stat-label">Open Complaints</div>
+            <div class="stat-value">{{ open_items | length }}</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card green">
+            <div class="stat-label">Resolved</div>
+            <div class="stat-value">{{ closed_items | length }}</div>
+        </div>
+    </div>
+</div>
+
+<!-- Open Feedback -->
+{% if open_items %}
+<div class="card card-bakery mb-4">
+    <div class="card-header" style="background:#FEF2F2;">
+        <h5 style="color:#DC2626;margin:0;"><i class="bi bi-exclamation-circle-fill me-2"></i>Open ({{ open_items|length }})</h5>
+    </div>
+    <div class="card-body p-0">
+        <table class="table table-bakery mb-0">
+            <thead>
+                <tr><th>Shop</th><th>Product</th><th>Type</th><th>Rating</th><th>Comment</th><th>Date</th><th>Action</th></tr>
+            </thead>
+            <tbody>
+            {% for f in open_items %}
+            <tr>
+                <td class="fw-600">{{ f.shop_name }}</td>
+                <td class="small">{{ f.product_name or '–' }}</td>
+                <td><span class="badge bg-warning text-dark" style="font-size:.72rem;">{{ f.feedback_type }}</span></td>
+                <td>
+                    {% if f.rating %}
+                    {% for i in range(f.rating|int) %}⭐{% endfor %}
+                    {% else %}–{% endif %}
+                </td>
+                <td class="small" style="max-width:220px;">{{ f.comments }}</td>
+                <td class="small text-muted">{{ f.created_at.strftime('%d %b') if f.created_at else '–' }}</td>
+                <td>
+                    <button class="btn btn-sm" style="background:#F0FDF4;color:#16A34A;border-radius:6px;"
+                            onclick="openResolve('{{ f.id }}','{{ f.shop_name|replace("'","") }}')">
+                        <i class="bi bi-check2-circle"></i> Resolve
+                    </button>
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<!-- Resolved Feedback -->
+<div class="card card-bakery">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-check-circle-fill me-2" style="color:#16A34A;"></i>Resolved ({{ closed_items|length }})</h5>
+    </div>
+    <div class="card-body p-0">
+        <table class="table table-bakery mb-0">
+            <thead>
+                <tr><th>Shop</th><th>Product</th><th>Comment</th><th>Resolution</th><th>Resolved By</th></tr>
+            </thead>
+            <tbody>
+            {% for f in closed_items %}
+            <tr>
+                <td class="fw-600">{{ f.shop_name }}</td>
+                <td class="small">{{ f.product_name or '–' }}</td>
+                <td class="small text-muted" style="max-width:200px;">{{ f.comments }}</td>
+                <td class="small" style="max-width:200px;">{{ f.resolution_notes or '–' }}</td>
+                <td class="small text-muted">{{ f.resolved_by_name or '–' }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5" class="text-center text-muted py-4">No resolved feedback yet.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Resolve Modal -->
+<div class="modal fade" id="resolveModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content" style="border-radius:16px;border:none;">
+            <div class="modal-header" style="border-bottom:2px solid #F5F3EE;">
+                <h5 class="modal-title" style="font-family:'Playfair Display',serif;">Resolve Feedback</h5>
+                <button class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" id="resolveForm">
+                <div class="modal-body">
+                    <div class="small text-muted mb-3" id="resolveShopName"></div>
+                    <label class="form-label fw-600">Resolution Notes</label>
+                    <textarea name="resolution_notes" class="form-control" rows="3"
+                              placeholder="What action was taken? e.g. Replaced pack, spoke to shop owner..."></textarea>
+                </div>
+                <div class="modal-footer" style="border-top:2px solid #F5F3EE;">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-bakery">Mark Resolved</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function openResolve(id, shop) {
+    document.getElementById('resolveForm').action = '/feedback/' + id + '/resolve';
+    document.getElementById('resolveShopName').textContent = 'Shop: ' + shop;
+    new bootstrap.Modal(document.getElementById('resolveModal')).show();
+}
+</script>
+{% endblock %}

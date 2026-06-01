@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Order Detail – Milan Bakery{% endblock %}
+{% block page_title %}Order {{ order.order_number }}{% endblock %}
+{% block content %}
+<div class="row g-4">
+    <div class="col-lg-8">
+        <div class="card-bakery card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5>🛒 Order Details</h5>
+                <span class="badge-status badge-{{ order.status }}">{{ order.status }}</span>
+            </div>
+            <div class="card-body">
+                <div class="row g-3 mb-4">
+                    <div class="col-6">
+                        <div class="small text-muted fw-600 mb-1">SHOP</div>
+                        <div class="fw-600">{{ order.shop_name }}</div>
+                        <div class="small text-muted">{{ order.address }}</div>
+                    </div>
+                    <div class="col-3">
+                        <div class="small text-muted fw-600 mb-1">ORDER DATE</div>
+                        <div>{{ order.order_date.strftime('%d %b %Y') if order.order_date else '–' }}</div>
+                    </div>
+                    <div class="col-3">
+                        <div class="small text-muted fw-600 mb-1">DELIVERY DATE</div>
+                        <div class="fw-600">{{ order.delivery_date }}</div>
+                    </div>
+                </div>
+
+                {% if order.special_instructions %}
+                <div class="p-3 rounded mb-4" style="background:#FFF8E7;border-left:3px solid #D4A574;">
+                    <div class="small fw-600 mb-1">Special Instructions</div>
+                    <div class="small">{{ order.special_instructions }}</div>
+                </div>
+                {% endif %}
+
+                <table class="table table-bakery">
+                    <thead><tr><th>Product</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr></thead>
+                    <tbody>
+                    {% for item in items %}
+                    <tr>
+                        <td class="fw-600">{{ item.product_name }}</td>
+                        <td>{{ item.quantity }} packs</td>
+                        <td>₹{{ "{:,.2f}".format(item.unit_price|float) }}</td>
+                        <td class="fw-bold">₹{{ "{:,.2f}".format(item.total_price|float) }}</td>
+                    </tr>
+                    {% endfor %}
+                    <tr style="border-top:2px solid #D4A574;">
+                        <td colspan="3" class="text-end fw-bold">Total</td>
+                        <td class="fw-bold" style="color:#8B4513;font-size:1.1rem;">
+                            ₹{{ "{:,.2f}".format(order.total_amount|float) if order.total_amount else '–' }}
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="card-bakery card">
+            <div class="card-header"><h5>⚙️ Update Status</h5></div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('update_order', order_id=order.id) }}">
+                    <div class="mb-3">
+                        <label class="form-label">New Status</label>
+                        <select name="status" class="form-select">
+                            <option value="PENDING" {{ 'selected' if order.status == 'PENDING' }}>Pending</option>
+                            <option value="CONFIRMED" {{ 'selected' if order.status == 'CONFIRMED' }}>Confirmed</option>
+                            <option value="ASSIGNED" {{ 'selected' if order.status == 'ASSIGNED' }}>Assigned</option>
+                            <option value="DELIVERED" {{ 'selected' if order.status == 'DELIVERED' }}>Delivered</option>
+                            <option value="CANCELLED" {{ 'selected' if order.status == 'CANCELLED' }}>Cancelled</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-bakery w-100">Update</button>
+                </form>
+                <a href="{{ url_for('orders') }}" class="btn btn-outline-bakery w-100 mt-2">← Back to Orders</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Payments – Milan Bakery{% endblock %}
+{% block page_title %}Payments & Invoicing{% endblock %}
+{% block content %}
+<div class="row g-4 mb-4">
+    <div class="col-lg-8">
+        <div class="card-bakery card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5><i class="bi bi-cash-coin me-2" style="color:#FF8C42;"></i>Recent Payments</h5>
+                <button class="btn btn-bakery btn-sm" data-bs-toggle="modal" data-bs-target="#recordPayModal">+ Record</button>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-bakery mb-0">
+                    <thead><tr><th>Payment No.</th><th>Shop</th><th>Type</th><th>Amount</th><th>Date</th><th>By</th><th>Status</th></tr></thead>
+                    <tbody>
+                    {% for p in payments %}
+                    <tr>
+                        <td class="small fw-600">{{ p.payment_number }}</td>
+                        <td>{{ p.shop_name }}</td>
+                        <td><span class="badge bg-light text-dark">{{ p.payment_type }}</span></td>
+                        <td class="fw-bold text-success">₹{{ "{:,.2f}".format(p.amount|float) }}</td>
+                        <td class="small text-muted">{{ p.payment_date.strftime('%d %b %Y') if p.payment_date else '–' }}</td>
+                        <td class="small">{{ p.collected_by or '–' }}</td>
+                        <td><span class="badge-status badge-DELIVERED">{{ p.status }}</span></td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="7" class="text-center text-muted py-5">No payments recorded.</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="card-bakery card">
+            <div class="card-header"><h5><i class="bi bi-exclamation-circle-fill me-2 text-danger"></i>Outstanding</h5></div>
+            <div class="card-body p-0">
+                {% for o in outstanding %}
+                <div class="px-3 py-2" style="border-bottom:1px solid #F5F3EE;">
+                    <div class="fw-600">{{ o.shop_name }}</div>
+                    <div class="d-flex justify-content-between">
+                        <span class="small text-muted">{{ o.invoice_count }} invoices | Due: {{ o.oldest_due }}</span>
+                        <span class="fw-bold text-danger">₹{{ "{:,.0f}".format(o.total_outstanding|float) }}</span>
+                    </div>
+                </div>
+                {% else %}
+                <div class="p-4 text-center text-muted small">✅ No outstanding payments</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Record Payment Modal -->
+<div class="modal fade" id="recordPayModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">💰 Record Payment</h5>
+                <button class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('record_payment') }}">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Shop *</label>
+                        <select name="shop_id" class="form-select" required>
+                            <option value="">Select shop...</option>
+                            {% for s in shops %}<option value="{{ s.id }}">{{ s.shop_name }}</option>{% endfor %}
+                        </select>
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-6">
+                            <label class="form-label">Amount (₹) *</label>
+                            <input type="number" name="amount" class="form-control" step="0.01" min="0" required>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Payment Type *</label>
+                            <select name="payment_type" class="form-select" required>
+                                <option value="CASH">Cash</option>
+                                <option value="UPI">UPI</option>
+                                <option value="CARD">Card</option>
+                                <option value="BANK_TRANSFER">Bank Transfer</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Reference / UTR No.</label>
+                        <input type="text" name="reference_number" class="form-control" placeholder="Optional reference number...">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button class="btn btn-bakery">Record Payment</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
