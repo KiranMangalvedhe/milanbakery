@@ -63,18 +63,29 @@ app.json_encoder = DecimalEncoder
 
 # ─────────────────────────────────────────────
 # Database Connection
-# Vercel serverless: one connection per request (no persistent pool across invocations)
-# Local dev: SimpleConnectionPool reuses connections within the same warm process
 # ─────────────────────────────────────────────
+def _clean_db_url(url):
+    """Remove connection parameters psycopg2 doesn't support (e.g. channel_binding)."""
+    import urllib.parse as up
+    try:
+        parts = up.urlparse(url)
+        qs = up.parse_qs(parts.query, keep_blank_values=True)
+        qs.pop("channel_binding", None)   # psycopg2 doesn't handle this param
+        new_query = up.urlencode({k: v[0] for k, v in qs.items()})
+        return up.urlunparse(parts._replace(query=new_query))
+    except Exception:
+        return url
+
+
 _db_pool = None
 
 def get_pool():
     global _db_pool
     if _db_pool is None:
-        db_url = os.environ.get("DATABASE_URL")
-        if not db_url:
-            raise RuntimeError("DATABASE_URL not set")
-        # SimpleConnectionPool works in both serverless and long-running processes
+        raw_url = os.environ.get("DATABASE_URL")
+        if not raw_url:
+            raise RuntimeError("DATABASE_URL environment variable is not set")
+        db_url = _clean_db_url(raw_url)
         _db_pool = psycopg2.pool.SimpleConnectionPool(
             1, 5, db_url,
             cursor_factory=psycopg2.extras.RealDictCursor
@@ -88,16 +99,17 @@ def get_db():
         try:
             g.db = get_pool().getconn()
         except Exception:
-            # Pool exhausted or stale — open a direct connection as fallback
-            db_url = os.environ.get("DATABASE_URL")
-            g.db = psycopg2.connect(db_url, cursor_factory=psycopg2.extras.RealDictCursor)
+            raw_url = os.environ.get("DATABASE_URL", "")
+            g.db = psycopg2.connect(
+                _clean_db_url(raw_url),
+                cursor_factory=psycopg2.extras.RealDictCursor
+            )
         g.db.autocommit = False
     return g.db
 
 
 @app.teardown_appcontext
-def close_db(error):
-    """Return the connection back to the pool (or close it) after each request."""
+def close_db(_error):
     db = g.pop("db", None)
     if db is not None:
         try:
@@ -2167,6 +2179,21 @@ def _run_migrations():
 
 # ─────────────────────────────────────────────
 # Error Handlers
+@app.route("/health")
+def health():
+    """Deployment health check — shows DB connectivity status."""
+    status = {}
+    status["DATABASE_URL_set"] = bool(os.environ.get("DATABASE_URL"))
+    status["SECRET_KEY_set"]   = bool(os.environ.get("SECRET_KEY"))
+    try:
+        query_db("SELECT 1 AS ok", one=True)
+        status["db"] = "connected"
+    except Exception as e:
+        status["db"] = f"ERROR: {e}"
+    ok = status["db"] == "connected"
+    return jsonify(status), (200 if ok else 500)
+
+
 # ─────────────────────────────────────────────
 @app.errorhandler(404)
 def not_found(e):
