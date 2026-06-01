@@ -62,7 +62,9 @@ app.secret_key = os.environ.get("SECRET_KEY", "milan-bakery-secret-dev-key-2025"
 app.json_encoder = DecimalEncoder
 
 # ─────────────────────────────────────────────
-# Database Connection Pool
+# Database Connection
+# Vercel serverless: one connection per request (no persistent pool across invocations)
+# Local dev: SimpleConnectionPool reuses connections within the same warm process
 # ─────────────────────────────────────────────
 _db_pool = None
 
@@ -72,31 +74,43 @@ def get_pool():
         db_url = os.environ.get("DATABASE_URL")
         if not db_url:
             raise RuntimeError("DATABASE_URL not set")
-        _db_pool = psycopg2.pool.ThreadedConnectionPool(
-            1, 10, db_url,
+        # SimpleConnectionPool works in both serverless and long-running processes
+        _db_pool = psycopg2.pool.SimpleConnectionPool(
+            1, 5, db_url,
             cursor_factory=psycopg2.extras.RealDictCursor
         )
     return _db_pool
 
 
 def get_db():
-    """Return the per-request DB connection from the pool."""
+    """Return the per-request DB connection, reused within the same request."""
     if "db" not in g:
-        g.db = get_pool().getconn()
+        try:
+            g.db = get_pool().getconn()
+        except Exception:
+            # Pool exhausted or stale — open a direct connection as fallback
+            db_url = os.environ.get("DATABASE_URL")
+            g.db = psycopg2.connect(db_url, cursor_factory=psycopg2.extras.RealDictCursor)
         g.db.autocommit = False
     return g.db
 
 
 @app.teardown_appcontext
 def close_db(error):
-    """Return the connection back to the pool after each request, always clean."""
+    """Return the connection back to the pool (or close it) after each request."""
     db = g.pop("db", None)
     if db is not None:
         try:
-            db.rollback()  # reset any open/failed transaction before returning to pool
+            db.rollback()
         except Exception:
             pass
-        get_pool().putconn(db)
+        try:
+            get_pool().putconn(db)
+        except Exception:
+            try:
+                db.close()
+            except Exception:
+                pass
 
 
 def query_db(sql, args=(), one=False, commit=False):
