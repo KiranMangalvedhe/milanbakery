@@ -1518,19 +1518,17 @@ def new_user():
                VALUES (%s,%s,%s,%s,'ACTIVE',NOW(),NOW()) RETURNING id""",
             (username, email, hashed, role_id)
         )
-        user_id = cur.fetchone()[0]
+        user_id = cur.fetchone()["id"]
         cur.execute(
             """INSERT INTO user_profiles (user_id,full_name,phone,created_at,updated_at)
                VALUES (%s,%s,%s,NOW(),NOW())""",
             (user_id, full_name, phone)
         )
         conn.commit()
-        flash(f"User {full_name} created!", "success")
+        flash(f"User {full_name} created successfully!", "success")
     except Exception as e:
         conn.rollback()
-        flash("Error creating user.", "danger")
-    finally:
-        conn.close()
+        flash(f"Error creating user: {e}", "danger")
 
     return redirect(url_for("users"))
 
