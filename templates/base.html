@@ -195,11 +195,59 @@
         .modal-header { border-bottom: 2px solid #F5F3EE; padding: 20px 24px; }
         .modal-title { font-family: 'Playfair Display', serif; font-size: 1.2rem; color: var(--dark); }
 
-        /* ─── Mobile ─── */
-        @media (max-width: 768px) {
-            .sidebar { transform: translateX(-100%); transition: .3s; }
+        /* ─── Hamburger button (mobile only) ─── */
+        .hamburger {
+            display: none;
+            background: none; border: none; padding: 6px 8px;
+            cursor: pointer; color: var(--dark);
+            font-size: 1.4rem; line-height: 1;
+        }
+
+        /* ─── Sidebar overlay backdrop ─── */
+        .sidebar-overlay {
+            display: none;
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,.45);
+            z-index: 999;
+        }
+        .sidebar-overlay.active { display: block; }
+
+        /* ─── Mobile breakpoint ─── */
+        @media (max-width: 991px) {
+            .hamburger { display: flex; align-items: center; }
+
+            .sidebar {
+                transform: translateX(-100%);
+                transition: transform .28s cubic-bezier(.4,0,.2,1);
+                z-index: 1050;
+            }
             .sidebar.open { transform: translateX(0); }
-            .main-content { margin-left: 0; }
+
+            .main-content { margin-left: 0 !important; }
+
+            .topbar { padding: 10px 16px; }
+            .topbar-title { font-size: 1.15rem; }
+            .content-area { padding: 16px 12px; }
+
+            /* Tables scroll horizontally */
+            .table-responsive-mobile { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+            /* Stat cards — full width on xs, 2-col on sm */
+            .stat-card { padding: 16px; }
+            .stat-value { font-size: 1.5rem; }
+
+            /* Modals full-width on mobile */
+            .modal-dialog { margin: 8px; }
+
+            /* Hide less critical table columns on small screens */
+            .hide-mobile { display: none !important; }
+        }
+
+        @media (max-width: 575px) {
+            .content-area { padding: 12px 8px; }
+            .card-bakery .card-header { padding: 12px 14px 10px; }
+            .card-bakery .card-body.p-0 + * { padding: 0; }
+            .table-bakery th, .table-bakery td { font-size: .78rem; padding: 8px 6px; }
         }
     </style>
     {% block head %}{% endblock %}
@@ -286,14 +334,22 @@
     </div>
 </div>
 
+<!-- ── Sidebar overlay (mobile tap-to-close) ── -->
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
 <!-- ── Main Content ── -->
 <div class="main-content">
     <div class="topbar">
-        <h2 class="topbar-title">{% block page_title %}Dashboard{% endblock %}</h2>
-        <div class="d-flex align-items-center gap-3">
-            <span class="text-muted small"><i class="bi bi-calendar3"></i> {{ now.strftime('%d %b %Y') if now else '' }}</span>
+        <div class="d-flex align-items-center gap-2">
+            <button class="hamburger" onclick="toggleSidebar()" aria-label="Menu">
+                <i class="bi bi-list"></i>
+            </button>
+            <h2 class="topbar-title mb-0">{% block page_title %}Dashboard{% endblock %}</h2>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <span class="text-muted small d-none d-md-inline"><i class="bi bi-calendar3"></i> {{ now.strftime('%d %b %Y') if now else '' }}</span>
             <a href="{{ url_for('shop_portal') }}" class="btn btn-sm btn-outline-bakery" target="_blank">
-                <i class="bi bi-shop"></i> Shop Portal
+                <i class="bi bi-shop"></i> <span class="d-none d-md-inline">Shop Portal</span>
             </a>
         </div>
     </div>
@@ -322,6 +378,34 @@
 if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/static/sw.js').catch(() => {});
 }
+
+function toggleSidebar() {
+    document.getElementById('sidebar').classList.toggle('open');
+    document.getElementById('sidebarOverlay').classList.toggle('active');
+}
+function closeSidebar() {
+    document.getElementById('sidebar').classList.remove('open');
+    document.getElementById('sidebarOverlay').classList.remove('active');
+}
+
+// Close sidebar when a nav link is clicked on mobile
+document.querySelectorAll('.sidebar .nav-link').forEach(link => {
+    link.addEventListener('click', () => {
+        if (window.innerWidth < 992) closeSidebar();
+    });
+});
+
+// Wrap all bakery tables in a scroll container automatically
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.table-bakery').forEach(table => {
+        if (!table.closest('.table-responsive-mobile')) {
+            const wrap = document.createElement('div');
+            wrap.className = 'table-responsive-mobile';
+            table.parentNode.insertBefore(wrap, table);
+            wrap.appendChild(table);
+        }
+    });
+});
 </script>
 </body>
 </html>
